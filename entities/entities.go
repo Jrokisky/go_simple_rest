@@ -20,6 +20,10 @@ type ErrorResponse struct {
 	Error string
 }
 
+type SuccessResponse struct {
+	Success string
+}
+
 // TODO: how does this handle access points?
 func (s *Site) ToJson() ([]byte, error) {
 	json, err := json.Marshal(s)
@@ -45,4 +49,3 @@ func AccessPointFromJson(json_data []byte) (AccessPoint, error) {
 
 // TODO: validation to ensure Sites cant have duplicate names
 // TODO: validation to ensure that Sites cant have accesspoints with the same labels
-// TODO: Recursive delete.

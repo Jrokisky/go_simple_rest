@@ -1,1 +1,1 @@
-{"Name":"tester","Role":"cat","Uri":"karate","Access_points":null}
+{"Name":"tester","Role":"cat","Uri":"karate","Access_points":[{"Label":"foo","Url":"bar"},{"Label":"baz","Url":"beep"}]}

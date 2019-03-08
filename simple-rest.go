@@ -17,11 +17,12 @@ func main() {
 	fs := fileStore.FileStore{}
 	fs.SetPrefix(FileStorePrefix)
 	router := mux.NewRouter()
-	router.HandleFunc("/sites/create", CreateSite).Methods("POST")
+	//router.HandleFunc("/sites/create", CreateSite).Methods("POST")
 	router.HandleFunc("/sites", GetSites).Methods("GET")
-	router.HandleFunc("/sites/{name}", GetSite).Methods("GET")
+  router.HandleFunc("/sites/{name}", SiteHandler).Methods("GET", "POST")
 	router.HandleFunc("/sites/{name}/accesspoints", GetAPs).Methods("GET")
 	router.HandleFunc("/sites/{name}/accesspoints/{label}", APHandler).Methods("GET", "POST")
+
 	http.ListenAndServe(":8080", router)
 }
 
@@ -217,6 +218,19 @@ func APHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 }
+
+func SiteHandler(w http.ResponseWriter, r *http.Request) {
+	// conditional check for type of request
+	// Request documentation states empty string from client means GET
+	if r.Method == "GET" || len(r.Method) == 0 {
+		GetSite(w,r)
+	} else if r.Method == "POST" {
+		CreateSite(w, r)
+	} else {
+		return
+	}
+}
+
 
 func sendError(w http.ResponseWriter, msg string) {
 	w.WriteHeader(400)

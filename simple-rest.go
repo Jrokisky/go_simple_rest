@@ -17,9 +17,8 @@ func main() {
 	fs := fileStore.FileStore{}
 	fs.SetPrefix(FileStorePrefix)
 	router := mux.NewRouter()
-	//router.HandleFunc("/sites/create", CreateSite).Methods("POST")
 	router.HandleFunc("/sites", GetSites).Methods("GET")
-  router.HandleFunc("/sites/{name}", SiteHandler).Methods("GET", "POST")
+	router.HandleFunc("/sites/{name}", SiteHandler).Methods("GET", "POST", "DELETE", "PUT")
 	router.HandleFunc("/sites/{name}/accesspoints", GetAPs).Methods("GET")
 	router.HandleFunc("/sites/{name}/accesspoints/{label}", APHandler).Methods("GET", "POST")
 
@@ -54,6 +53,46 @@ func CreateSite(w http.ResponseWriter, r *http.Request) {
 	if exists {
 		sendError(w, "A site already exists with this name")
 	} else {
+		// TODO: Do we need to ensure that the value in the given name field match the url parameter or can we just use the value in the url?
+		err := WriteSiteToStore(site)
+		if err != nil {
+			sendError(w, err.Error())
+			return
+		} else {
+			// Set the proper response code and return the created item.
+			w.WriteHeader(201)
+			json.NewEncoder(w).Encode(site)
+		}
+	}
+}
+
+func EditSite(w http.ResponseWriter, r *http.Request) {
+	params := mux.Vars(r)
+	var site entities.Site
+	_ = json.NewDecoder(r.Body).Decode(&site)
+	old_site, err := GetSiteFromStore(w, r)
+
+	if err != nil {
+		sendError(w, err.Error())
+		return
+	} else {
+		// If the names are different delete the old filestore, so we can create
+		// one with the new name.
+		if params["name"] != site.Name {
+			fs := fileStore.FileStore{}
+			fs.SetPrefix(FileStorePrefix)
+			err := fs.Delete(params["name"])
+			if err != nil {
+				sendError(w, "Unable to update site")
+				return
+			}
+		}
+
+		// Since access_points shouldn't be updatable through this call, set
+		// access_points to value in current site object.
+		site.Access_points = old_site.Access_points
+
+		// Write updated Site to FileStore.
 		err := WriteSiteToStore(site)
 		if err != nil {
 			sendError(w, err.Error())
@@ -131,6 +170,27 @@ func GetSite(w http.ResponseWriter, r *http.Request) {
 	}
 
 	json.NewEncoder(w).Encode(site)
+}
+
+func DeleteSite(w http.ResponseWriter, r *http.Request) {
+	params := mux.Vars(r)
+	// Check if site exists in the File Store.
+	fs := fileStore.FileStore{}
+	fs.SetPrefix(FileStorePrefix)
+	exists := fs.Exists(params["name"])
+	if exists {
+		err := fs.Delete(params["name"])
+		if err != nil {
+			sendError(w, err.Error())
+			return
+		} else {
+			sendSuccess(w, "Site Deleted")
+			return
+		}
+	} else {
+		sendError(w, "Site does not exist")
+		return
+	}
 }
 
 func GetAPs(w http.ResponseWriter, r *http.Request) {
@@ -226,6 +286,10 @@ func SiteHandler(w http.ResponseWriter, r *http.Request) {
 		GetSite(w,r)
 	} else if r.Method == "POST" {
 		CreateSite(w, r)
+	} else if r.Method == "PUT" {
+		EditSite(w, r)
+	} else if r.Method == "DELETE" {
+		DeleteSite(w, r)
 	} else {
 		return
 	}
@@ -235,4 +299,9 @@ func SiteHandler(w http.ResponseWriter, r *http.Request) {
 func sendError(w http.ResponseWriter, msg string) {
 	w.WriteHeader(400)
 	json.NewEncoder(w).Encode(entities.ErrorResponse{msg})
+}
+
+func sendSuccess(w http.ResponseWriter, msg string) {
+	w.WriteHeader(200)
+	json.NewEncoder(w).Encode(entities.SuccessResponse{msg})
 }

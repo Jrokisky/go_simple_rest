@@ -28,6 +28,10 @@ func (fs *FileStore) Write(file_name string, data []byte) error {
 	return err
 }
 
+func (fs *FileStore) Delete(file_name string) error {
+	return os.Remove(fs.prefix + file_name)
+}
+
 func (fs *FileStore) Exists(file_name string) (bool) {
 	if _, err := os.Stat(fs.prefix + file_name); os.IsNotExist(err) {
 		return false

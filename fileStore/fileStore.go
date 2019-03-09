@@ -8,6 +8,7 @@ package fileStore
 import (
 	"io/ioutil"
 	"os"
+	"strings"
 )
 
 type FileStore struct {
@@ -50,5 +51,24 @@ func (fs *FileStore) GetFiles() ([]string, error) {
 			file_names = append(file_names, file.Name())
 		}
 		return file_names, nil
+	}
+}
+
+func (fs *FileStore) RemoveTestFiles() (error) {
+	files, err := ioutil.ReadDir(fs.prefix)
+	if err != nil {
+		return  err
+	} else {
+		for _, file := range files {
+			file_name := file.Name()
+			if strings.HasPrefix(file_name, "test_") {
+				err = os.Remove(fs.prefix + file_name)
+				if err != nil {
+					return err
+				}
+
+			}
+		}
+		return nil
 	}
 }

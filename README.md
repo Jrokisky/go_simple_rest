@@ -1,8 +1,6 @@
 # CMSC 621 Project 1
 
-## Team
-	* Frank Serna
-	* Justin Rokisky
+## Team: Frank Serna & Justin Rokisky
 
 ## About
 This software provides a RESTful API for interacting with sites and access points.  Sites have the following properties:

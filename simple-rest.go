@@ -20,7 +20,7 @@ func main() {
 	router.HandleFunc("/sites", GetSites).Methods("GET")
 	router.HandleFunc("/sites/{name}", SiteHandler).Methods("GET", "POST", "DELETE", "PUT")
 	router.HandleFunc("/sites/{name}/accesspoints", GetAPs).Methods("GET")
-	router.HandleFunc("/sites/{name}/accesspoints/{label}", APHandler).Methods("GET", "POST")
+	router.HandleFunc("/sites/{name}/accesspoints/{label}", APHandler).Methods("GET", "POST", "DELETE", "PUT")
 
 	http.ListenAndServe(":8080", router)
 }
@@ -269,11 +269,50 @@ func CreateAP(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+func DeleteAP(w http.ResponseWriter, r *http.Request) {
+	params := mux.Vars(r)
+
+	site, err := GetSiteFromStore(w, r)
+	if err != nil {
+		sendError(w, err.Error())
+		return
+	}
+
+	// Find the accesspoint
+	found := 0
+	for i, site_ap := range site.Access_points {
+		// if we find it, remove it by slice
+		if site_ap.Label == params["label"] {
+			found = 1
+			site.Access_points[i] = site.Access_points[0]
+			site.Access_points = site.Access_points[1:]
+			break
+		}
+	}
+
+	// ap doesn't exist
+	if found == 0 {
+		sendError(w, "Access point does not exist")
+		return
+	}
+
+	// Write changes to site
+	err = WriteSiteToStore(site)
+	if err != nil {
+		sendError(w, err.Error())
+		return
+	} 
+
+	sendSuccess(w, "Access point Deleted")
+}
+
 func APHandler(w http.ResponseWriter, r *http.Request) {
 	if r.Method == "GET" || len(r.Method) == 0 {
 		GetAP(w, r)
-	} else if r.Method == "POST" {
+	} else if r.Method == "POST" || r.Method == "PUT" {
 		CreateAP(w, r)
+	} else if r.Method == "DELETE" {
+		DeleteAP(w, r)
 	} else {
 		return
 	}
@@ -294,7 +333,6 @@ func SiteHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 }
-
 
 func sendError(w http.ResponseWriter, msg string) {
 	w.WriteHeader(400)

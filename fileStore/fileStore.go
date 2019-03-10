@@ -61,7 +61,7 @@ func (fs *FileStore) RemoveTestFiles() (error) {
 	} else {
 		for _, file := range files {
 			file_name := file.Name()
-			if strings.HasPrefix(file_name, "test_") {
+			if strings.HasPrefix(file_name, "test") {
 				err = os.Remove(fs.prefix + file_name)
 				if err != nil {
 					return err

@@ -26,7 +26,12 @@ type SuccessResponse struct {
 	Success string
 }
 
-func (s *Site) EqualTo(s2 *Site) (bool) {
+func (s *Site) EqualTo(s2 *Site, ignore_access_points bool) (bool) {
+	if ignore_access_points {
+		var emptyAP = []AccessPoint{}
+		s.Access_points = emptyAP
+		s2.Access_points = emptyAP
+	}
 	s_json, err := s.ToJson()
 	if err != nil {
 		return false
@@ -38,6 +43,20 @@ func (s *Site) EqualTo(s2 *Site) (bool) {
 	}
 
 	return string(s_json) == string(s2_json)
+}
+
+func (ap *AccessPoint) EqualTo(ap2 *AccessPoint) (bool) {
+	ap_json, err := ap.ToJson()
+	if err != nil {
+		return false
+	}
+
+	ap2_json, err2 := ap2.ToJson()
+	if err2 != nil {
+		return false
+	}
+
+	return string(ap_json) == string(ap2_json)
 }
 
 func (s *Site) Validate() (error) {

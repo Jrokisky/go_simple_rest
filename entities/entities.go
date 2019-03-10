@@ -49,7 +49,7 @@ func (s *Site) Validate() (error) {
 	apLabels := make(map[string]int)
 	for _, ap := range s.Access_points {
 		if apLabels[ap.Label] == 1 {
-			return errors.New("Site name can only contain lowercase letters")
+			return errors.New("Access Point labels must be unique")
 		} else {
 			apLabels[ap.Label] = 1
 		}

@@ -2,6 +2,8 @@ package entities
 
 import (
 	"encoding/json"
+	"regexp"
+	"errors"
 )
 
 type Site struct {
@@ -36,6 +38,23 @@ func (s *Site) EqualTo(s2 *Site) (bool) {
 	}
 
 	return string(s_json) == string(s2_json)
+}
+
+func (s *Site) Validate() (error) {
+	isAlpha := regexp.MustCompile(`^[a-z]+$`).MatchString
+	if !isAlpha(s.Name) {
+		return errors.New("Site name can only contain lowercase letters")
+	}
+
+	apLabels := make(map[string]int)
+	for _, ap := range s.Access_points {
+		if apLabels[ap.Label] == 1 {
+			return errors.New("Site name can only contain lowercase letters")
+		} else {
+			apLabels[ap.Label] = 1
+		}
+	}
+	return nil
 }
 
 func (s *Site) ToJson() ([]byte, error) {

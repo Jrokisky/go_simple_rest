@@ -33,6 +33,13 @@ In a terminal, type
 go run simple-rest.go
 ```
 
+### Running the test suite
+* Run the application using the instructions above.
+* In a separate terminal, type
+```bash
+go test
+```
+
 ### RESTful API commands
 #### GET requests
 GET requests provide viewable JSON properties of the object fetched.  These can be sites or access points.  Examples using a browser follow:
@@ -82,8 +89,3 @@ curl -X "DELETE" http://localhost:8080/sites/test
 ```bash
 curl -X "DELETE" http://localhost:8080/sites/test/accesspoints/dog
 ```
-### Testing Instructions
-We added a test suite to help test our application.
-To test:
-	* run the application using the instructions above.
-	* in a separate terminal run: go test

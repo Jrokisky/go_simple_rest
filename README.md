@@ -73,12 +73,12 @@ curl -d '{"Name":"foo","Role":"cat","Uri":"karate","Access_points":[{"Label":"fo
 ```bash
 curl -d '{"Label":"dog","Url":"cat"}' -H "Content-Type: application/json" http://localhost:8080/sites/foo/accesspoints
 ```
-* POST update existing accesspoint dog to site foo with a new url tiger:
-```bash
-curl -d '{"Label":"dog","Url":"tiger"}' -H "Content-Type: application/json" http://localhost:8080/sites/foo/accesspoints
-```
 #### PUT requests
-For this API, PUT and POST requests are synonymous as the resource id (name for site and label for accesspoint) is assumed to be provided by the user.  Please see the POST requests section.
+For this API, PUT and POST requests are synonymous as the resource id (name for site and label for accesspoint) is assumed to be provided by the user.  Use PUT when updating accesspoints; otherwise use POST. Please see the POST requests section.
+* PUT update existing accesspoint dog to site foo with a new url tiger:
+```bash
+curl -X PUT -d '{"Label":"dog","Url":"tiger"}' -H "Content-Type: application/json" http://localhost:8080/sites/foo/accesspoints
+```
 #### DELETE requests
 DELETE requests remove site or accesspoint objects.  Since each site stores access points, a site deletion will delete all access points associated with the site.  Examples follow:
 * DELETE a site named test:

@@ -78,6 +78,3 @@ func AccessPointFromJson(json_data []byte) (AccessPoint, error) {
 	err := json.Unmarshal(json_data, &accessPoint)
 	return accessPoint, err
 }
-
-// TODO: validation to ensure Sites cant have duplicate names
-// TODO: validation to ensure that Sites cant have accesspoints with the same labels

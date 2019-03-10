@@ -308,6 +308,43 @@ func CreateUpdateAP(w http.ResponseWriter, r *http.Request, op string) {
 	}
 }
 
+func DeleteAP(w http.ResponseWriter, r *http.Request) {
+	params := mux.Vars(r)
+
+	site, err := GetSiteFromStore(w, r)
+	if err != nil {
+		sendError(w, err.Error())
+		return
+	}
+
+	// Find the accesspoint
+	found := 0
+	for i, site_ap := range site.Access_points {
+		// if we find it, remove it by slice
+		if site_ap.Label == params["label"] {
+			found = 1
+			site.Access_points[i] = site.Access_points[0]
+			site.Access_points = site.Access_points[1:]
+			break
+		}
+	}
+
+	// ap doesn't exist
+	if found == 0 {
+		sendError(w, "Access point does not exist")
+		return
+	}
+
+	// Write changes to site
+	err = WriteSiteToStore(site)
+	if err != nil {
+		sendError(w, err.Error())
+		return
+	} 
+
+	sendSuccess(w, "Access point Deleted")
+}
+
 func APHandler(w http.ResponseWriter, r *http.Request) {
 	params := mux.Vars(r)
 	ap_label := params["label"]
@@ -351,7 +388,6 @@ func SiteHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 }
-
 
 func sendError(w http.ResponseWriter, msg string) {
 	w.WriteHeader(400)

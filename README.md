@@ -4,40 +4,88 @@
 	* Frank Serna
 	* Justin Rokisky
 
-## Project Details
+## About
+This software provides a RESTful API for interacting with sites and access points.  Sites have the following properties:
 
-### Setup Instructions
-	* Install Gorilla Mux: go get github.com/gorilla/mux
-	* Ensure a directory exists with the name of the File Prefix in 'simple-rest.go'
+```go
+type Site struct {
+	Name string
+	Role string
+	Uri string
+	Access_points []AccessPoint
+}
+```
+and access points have the following properties:
 
-### Architecture
-	* We store data using our file store package
-		* each site is stored in its own file under the File Prefix
-		* this allows for easy existance checks as well as limits the size of data that needs to be written to disk on updates.
-		* this also allows less conflict if multiple operations are done concurrently
-	* We use the /sites endpoint for:
-		* GET => gets all sites
-		* PUT => updates a given site
-		* POST => creates a new site
-	* We use the /sites/$SITENAME endpoint for:
-		* GET => get site identified by $SITENAME
-		* DELETE => delete the site identified by $SITENAME
-	* We use the /sites/$SITENAME/accesspoints for:
-		* GET => gets all access points of the given site
-		* PUT => updates a given access point
-		* POST => creates an access point on the given site
-	* We use the /sites/$SITENAME/accesspoints/$APLABEL
-		* GET => gets the accesspoint identified by $APLABLE from the site identified by $SITENAME
-		* DELETE => deletes the accesspoint identified by $APLABLE from the site identified by $SITENAME
+```go
+type AccessPoint struct {
+	Label string
+	Url string
+}
+```
 
-### Assumptions Made
-We assumed that the goal of this project was to focus primarily on build a REST API that used JSON for messaging.
-Due to this, the following reasonable assumptions were made:
-	* Site names would be limited to a single string of lower case letters
-	* 
+Data is persisted by storing each site in json form in a file named site.Name. This allows for easy existance checks, limits the size of data that needs to be written to disk on updates and also allows less conflict if multiple operations are done concurrently
 
+
+Interaction is provided by GET, POST, PUT, DELETE commands explained below.
+
+### Running the server
+In a terminal, type
+```bash
+go run simple-rest.go
+```
+
+### RESTful API commands
+#### GET requests
+GET requests provide viewable JSON properties of the object fetched.  These can be sites or access points.  Examples using a browser follow:
+* View all sites: 
+```bash
+http://localhost:8080/sites
+```
+* View a specific site named $SITE_NAME:
+```bash
+http://localhost:8080/sites/$SITE_NAME
+```
+* View all accesspoints to a specific $SITE_NAME:
+```bash
+http://localhost:8080/sites/$SITE_NAME/accesspoints
+```
+* View a specific access point $AP_NAME at site $SITE_NAME:
+```bash
+http://localhost:8080/sites/$SITE_NAME/accesspoints/$AP_NAME
+```
+#### POST requests
+POST requests create or update a site or access point object.  These are submitted via JSON.  Because name and label designate the site and accesspoint id, POST creates only the specified JSON object if it does not exist, otherwise it updates the object with the same resource id.  Examples using curl are as follows:
+* POST a new site foo with empty access points:
+```bash
+curl -d '{"Name":"foo","Role":"cat","Uri":"karate","Access_points":null}' -H "Content-Type: application/json" http://localhost:8080/sites
+```
+* POST a new site foo with access points:
+```bash
+curl -d '{"Name":"foo","Role":"cat","Uri":"karate","Access_points":[{"Label":"foo","Url":"bar"},{"Label":"baz","Url":"beep"}]}' -H "Content-Type: application/json" http://localhost:8080/sites
+```
+* POST a new accesspoint dog to site foo:
+```bash
+curl -d '{"Label":"dog","Url":"cat"}' -H "Content-Type: application/json" http://localhost:8080/sites/foo/accesspoints
+```
+* POST update existing accesspoint dog to site foo with a new url tiger:
+```bash
+curl -d '{"Label":"dog","Url":"tiger"}' -H "Content-Type: application/json" http://localhost:8080/sites/foo/accesspoints
+```
+#### PUT requests
+For this API, PUT and POST requests are synonymous as the resource id (name for site and label for accesspoint) is assumed to be provided by the user.  Please see the POST requests section.
+#### DELETE requests
+DELETE requests remove site or accesspoint objects.  Since each site stores access points, a site deletion will delete all access points associated with the site.  Examples follow:
+* DELETE a site named test:
+```bash
+curl -X "DELETE" http://localhost:8080/sites/test
+```
+* DELETE an accesspoint dog on site test:
+```bash
+curl -X "DELETE" http://localhost:8080/sites/test/accesspoints/dog
+```
 ### Testing Instructions
 We added a test suite to help test our application.
 To test:
-	* run the application
+	* run the application using the instructions above.
 	* in a separate terminal run: go test

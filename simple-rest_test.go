@@ -39,21 +39,30 @@ func TestEditSite(t *testing.T) {
 	// Always remove whatever testing data we created.
 	defer RemoveTestData(t)
 	var emptyAP = []entities.AccessPoint{}
-	example_site := entities.Site{test_prefix + "two", test_prefix + "role1", test_prefix + "uri1", emptyAP}
+	var access_points = []entities.AccessPoint{}
+	ap := entities.AccessPoint{"pet", "http://pets.com"}
+	ap1 := entities.AccessPoint{"book", "Harry Potter"}
+	ap2 := entities.AccessPoint{"cat", "Olive"}
+	access_points = append(access_points, ap)
+	access_points = append(access_points, ap1)
+	access_points = append(access_points, ap2)
+	example_site := entities.Site{test_prefix + "two", test_prefix + "role1", test_prefix + "uri1", access_points}
 
 	fmt.Println("\tCreating Site:", example_site)
 	createTestSite(t, example_site, 200)
+	// Test our access point endpoint works.
+	getTestAccessPoint(t, example_site.Name, "cat", 200, ap2)
+	getTestAccessPoint(t, example_site.Name, "ffrog", 400, entities.AccessPoint{})
 
 	example_site_update := entities.Site{test_prefix + "two", test_prefix + "role_update", test_prefix + "uri_update", emptyAP}
 	fmt.Println("\tUpdating Site:", example_site_update)
 	editTestSite(t, example_site_update, 200)
+	// Ensure our access points weren't updated
+	getTestAccessPoint(t, example_site.Name, "cat", 200, ap2)
 
 	fmt.Println("\tTrying to update nonexistant site. (Failure expected)")
 	example_site_update_fake := entities.Site{test_prefix + "fake", test_prefix + "role_update", test_prefix + "uri_update", emptyAP}
 	editTestSite(t, example_site_update_fake, 400)
-
-	// TODO check access points arent updated.
-
 }
 
 
@@ -64,11 +73,21 @@ func TestEditSite(t *testing.T) {
 func TestDeleteSite (t *testing.T) {
 	fmt.Println("RUNNING: Test Delete Site")
 	defer RemoveTestData(t)
-	var emptyAP = []entities.AccessPoint{}
-	example_site := entities.Site{test_prefix + "three", test_prefix + "role1", test_prefix + "uri1", emptyAP}
+	var access_points = []entities.AccessPoint{}
+	ap := entities.AccessPoint{"pet", "http://pets.com"}
+	ap1 := entities.AccessPoint{"book", "Harry Potter"}
+	ap2 := entities.AccessPoint{"cat", "Olive"}
+	access_points = append(access_points, ap)
+	access_points = append(access_points, ap1)
+	access_points = append(access_points, ap2)
+	example_site := entities.Site{test_prefix + "three", test_prefix + "role1", test_prefix + "uri1", access_points}
 
 	fmt.Println("\tCreating Site:", example_site)
 	createTestSite(t, example_site, 200)
+	getTestAccessPoint(t, example_site.Name, "book", 200, ap1)
+	deleteTestAccessPoint(t, example_site.Name, "book", 200)
+	deleteTestAccessPoint(t, example_site.Name, "book", 400)
+	getTestAccessPoint(t, example_site.Name, "book", 400, ap1)
 
 	fmt.Println("\tDeleting Site:", example_site)
 	deleteTestSite(t, example_site.Name, 200)
@@ -105,7 +124,7 @@ func createTestSite(t *testing.T, site entities.Site, expected_response_code int
 		}
 
 		// Ensure we were returned the data we sent
-		if !returned_site.EqualTo(&site) {
+		if !returned_site.EqualTo(&site, false) {
 			t.Error("Error creating site")
 			return
 		}
@@ -115,6 +134,43 @@ func createTestSite(t *testing.T, site entities.Site, expected_response_code int
 		fmt.Println("\t\tSite successfully created: ", site)
 	} else {
 		fmt.Println("\t\tExpected site creation failure: ", site)
+	}
+}
+
+func createTestAccessPoint(t *testing.T, site_name string, access_point entities.AccessPoint, expected_response_code int) {
+	ap_json, _ := access_point.ToJson()
+	resp, err := http.Post(url + "/sites/" + site_name + "/accesspoints", "application/json", bytes.NewBuffer(ap_json))
+	if err != nil {
+		t.Error("Error running test: " + err.Error())
+		return
+	}
+
+	// Ensure we got the expected response code.
+	if resp.StatusCode != expected_response_code {
+		t.Error("Returned repsonse code:", resp.StatusCode, " does not match expected: ", expected_response_code)
+		return
+	}
+
+	// We expect a successful response.
+	if expected_response_code == 200 {
+		var returned_ap entities.AccessPoint
+		err = json.NewDecoder(resp.Body).Decode(&returned_ap)
+		if err != nil {
+			t.Error("Error running test: " + err.Error())
+			return
+		}
+
+		// Ensure we were returned the data we sent
+		if !returned_ap.EqualTo(&access_point) {
+			t.Error("Error creating access point")
+			return
+		}
+
+		// Check that the site exists in the filestore.
+		getTestAccessPoint(t, site_name, access_point.Label, 200, access_point)
+		fmt.Println("\t\tAccess Point successfully created: ", access_point)
+	} else {
+		fmt.Println("\t\tExpected access point creation failure: ", access_point)
 	}
 }
 
@@ -150,7 +206,7 @@ func editTestSite(t *testing.T, site entities.Site, expected_response_code int) 
 		}
 
 		// Ensure we were returned the data we sent
-		if !returned_site.EqualTo(&site) {
+		if !returned_site.EqualTo(&site, true) {
 			t.Error("Error creating site")
 			return
 		}
@@ -186,13 +242,45 @@ func getTestSite(t *testing.T, site_name string, expected_response_code int, exp
 		}
 
 		// Ensure the correct site was returned.
-		if !returned_site.EqualTo(&expected_response_site) {
+		if !returned_site.EqualTo(&expected_response_site, true) {
 			t.Error("Returned site: ", returned_site, " does not match expected: ", expected_response_site)
 			return
 		}
 		fmt.Println("\t\tSite successfully got: ", site_name)
 	} else {
 		fmt.Println("\t\tExpected site get failure: ", site_name)
+	}
+}
+
+func getTestAccessPoint(t *testing.T, site_name string, access_point_label string, expected_response_code int, expected_response_ap entities.AccessPoint) {
+	resp, err := http.Get(url + "/sites/" + site_name + "/accesspoints/" + access_point_label)
+	if err != nil {
+		t.Error("Error running test: ", site_name)
+		return
+	}
+
+	if resp.StatusCode != expected_response_code {
+		t.Error("Returned repsonse code:", resp.StatusCode, " does not match expected: ", expected_response_code)
+		return
+	}
+
+	if expected_response_code == 200 {
+		// Load our site.
+		var returned_ap entities.AccessPoint
+		err = json.NewDecoder(resp.Body).Decode(&returned_ap)
+		if err != nil {
+			t.Error("Error running test: " + err.Error())
+			return
+		}
+
+		// Ensure the correct ap was returned.
+		if !returned_ap.EqualTo(&expected_response_ap) {
+			t.Error("Returned Access Point: ", returned_ap, " does not match expected: ", expected_response_ap)
+			return
+		}
+		fmt.Println("\t\tAccess Point successfully got: ", access_point_label)
+	} else {
+		fmt.Println("\t\tExpected access point get failure: ", access_point_label)
 	}
 }
 
@@ -219,6 +307,32 @@ func deleteTestSite(t *testing.T, site_name string, expected_response_code int) 
 		fmt.Println("\t\tSite successfully deleted: ", site_name)
 	} else {
 		fmt.Println("\t\tExpected site delete failure: ", site_name)
+	}
+}
+
+func deleteTestAccessPoint(t *testing.T, site_name string, access_point_label string, expected_response_code int) {
+	client := &http.Client{}
+	req, _ := http.NewRequest("DELETE", url + "/sites/" + site_name + "/accesspoints/" + access_point_label, nil)
+	resp, err := client.Do(req)
+	if err != nil {
+		t.Error("Error running test: " + err.Error())
+		return
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != expected_response_code {
+		t.Error("Returned repsonse code:", resp.StatusCode, " does not match expected: ", expected_response_code)
+		return
+	}
+
+	// We are expecting a successful delete.
+	if expected_response_code == 200 {
+		// Try to get the site to ensure it was removed from the file store.
+		expected_response_ap := entities.AccessPoint{}
+		getTestAccessPoint(t, site_name, access_point_label, 400, expected_response_ap)
+		fmt.Println("\t\tAccess Point successfully deleted: ", access_point_label)
+	} else {
+		fmt.Println("\t\tExpected access point delete failure: ", access_point_label)
 	}
 }
 

@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"net/http"
 	//"log"
-	//"fmt"
 	"errors"
 	"github.com/gorilla/mux"
 	"./fileStore"
@@ -218,12 +217,12 @@ func GetAPs(w http.ResponseWriter, r *http.Request) {
 
 func GetAP(w http.ResponseWriter, r *http.Request) {
 	params := mux.Vars(r)
-
 	site, err := GetSiteFromStore(w, r)
 	if err != nil {
 		sendError(w, err.Error())
 		return
 	}
+
 
 	// Find the accesspoint
 	var ap entities.AccessPoint
@@ -254,9 +253,6 @@ func CreateUpdateAP(w http.ResponseWriter, r *http.Request, op string) {
 	var ap entities.AccessPoint
 	_ = json.NewDecoder(r.Body).Decode(&ap)
 
-	// Create new list in case we're deleting.
-	var current_access_points = []entities.AccessPoint{}
-
 	// Check for accesspoint label
 	found := 0
 	for i := 0; i < len(site.Access_points); i++ {
@@ -272,11 +268,6 @@ func CreateUpdateAP(w http.ResponseWriter, r *http.Request, op string) {
 				site.Access_points[i].Url = ap.Url
 				break;
 			}
-		} else {
-			if op == "delete" {
-				// Stash non delete elements for later.
-				current_access_points = append(current_access_points, site.Access_points[i])
-			}
 		}
 	}
 
@@ -290,10 +281,6 @@ func CreateUpdateAP(w http.ResponseWriter, r *http.Request, op string) {
 			sendError(w, "Access Point does not exist")
 			return
 		}
-	}
-
-	if op == "delete" {
-		site.Access_points = current_access_points
 	}
 
 	// Rewrite entire site to file - I think this is easier than piece-wise update
@@ -340,7 +327,7 @@ func DeleteAP(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		sendError(w, err.Error())
 		return
-	} 
+	}
 
 	sendSuccess(w, "Access point Deleted")
 }
@@ -360,7 +347,7 @@ func APHandler(w http.ResponseWriter, r *http.Request) {
 	} else if r.Method == "PUT" {
 		CreateUpdateAP(w, r, "update")
 	} else if r.Method == "DELETE" {
-		CreateUpdateAP(w, r, "delete")
+		DeleteAP(w, r)
 	} else {
 		return
 	}

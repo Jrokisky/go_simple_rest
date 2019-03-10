@@ -17,10 +17,10 @@ func main() {
 	fs := fileStore.FileStore{}
 	fs.SetPrefix(FileStorePrefix)
 	router := mux.NewRouter()
-	router.HandleFunc("/sites", GetSites).Methods("GET")
-	router.HandleFunc("/sites/{name}", SiteHandler).Methods("GET", "POST", "DELETE", "PUT")
-	router.HandleFunc("/sites/{name}/accesspoints", GetAPs).Methods("GET")
-	router.HandleFunc("/sites/{name}/accesspoints/{label}", APHandler).Methods("GET", "POST", "DELETE", "PUT")
+	router.HandleFunc("/sites", SiteHandler).Methods("GET", "POST", "PUT")
+	router.HandleFunc("/sites/{name}", SiteHandler).Methods("GET", "DELETE")
+	router.HandleFunc("/sites/{name}/accesspoints", APHandler).Methods("GET", "POST", "PUT")
+	router.HandleFunc("/sites/{name}/accesspoints/{label}", APHandler).Methods("GET", "DELETE")
 
 	http.ListenAndServe(":8080", router)
 }
@@ -53,53 +53,66 @@ func CreateSite(w http.ResponseWriter, r *http.Request) {
 	if exists {
 		sendError(w, "A site already exists with this name")
 	} else {
-		// TODO: Do we need to ensure that the value in the given name field match the url parameter or can we just use the value in the url?
-		err := WriteSiteToStore(site)
+		err := site.Validate()
+		if err != nil {
+			sendError(w, err.Error())
+			return
+		}
+		err = WriteSiteToStore(site)
 		if err != nil {
 			sendError(w, err.Error())
 			return
 		} else {
 			// Set the proper response code and return the created item.
-			w.WriteHeader(201)
+			w.WriteHeader(200)
 			json.NewEncoder(w).Encode(site)
 		}
 	}
 }
 
 func EditSite(w http.ResponseWriter, r *http.Request) {
-	params := mux.Vars(r)
 	var site entities.Site
 	_ = json.NewDecoder(r.Body).Decode(&site)
-	old_site, err := GetSiteFromStore(w, r)
+	fs := fileStore.FileStore{}
+	fs.SetPrefix(FileStorePrefix)
+
+	// Check if the site exists.
+	exists := fs.Exists(site.Name)
+	if !exists {
+		sendError(w, "Site does not exist")
+		return
+	}
+
+	// Load data from file so we can get our access points.
+	old_site_data, err := fs.Load(site.Name)
+	if err != nil {
+		sendError(w, err.Error())
+		return
+	}
+
+	// Build site from file data.
+	old_site, err := entities.SiteFromJson(old_site_data)
 
 	if err != nil {
 		sendError(w, err.Error())
 		return
 	} else {
-		// If the names are different delete the old filestore, so we can create
-		// one with the new name.
-		if params["name"] != site.Name {
-			fs := fileStore.FileStore{}
-			fs.SetPrefix(FileStorePrefix)
-			err := fs.Delete(params["name"])
-			if err != nil {
-				sendError(w, "Unable to update site")
-				return
-			}
-		}
-
 		// Since access_points shouldn't be updatable through this call, set
 		// access_points to value in current site object.
 		site.Access_points = old_site.Access_points
-
+		err := site.Validate()
+		if err != nil {
+			sendError(w, err.Error())
+			return
+		}
 		// Write updated Site to FileStore.
-		err := WriteSiteToStore(site)
+		err = WriteSiteToStore(site)
 		if err != nil {
 			sendError(w, err.Error())
 			return
 		} else {
 			// Set the proper response code and return the created item.
-			w.WriteHeader(201)
+			w.WriteHeader(200)
 			json.NewEncoder(w).Encode(site)
 		}
 	}
@@ -230,7 +243,7 @@ func GetAP(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(ap)
 }
 
-func CreateAP(w http.ResponseWriter, r *http.Request) {
+func CreateUpdateAP(w http.ResponseWriter, r *http.Request, op string) {
 	// Get the site
 	site, err := GetSiteFromStore(w, r)
 	if err != nil {
@@ -241,20 +254,46 @@ func CreateAP(w http.ResponseWriter, r *http.Request) {
 	var ap entities.AccessPoint
 	_ = json.NewDecoder(r.Body).Decode(&ap)
 
+	// Create new list in case we're deleting.
+	var current_access_points = []entities.AccessPoint{}
+
 	// Check for accesspoint label
 	found := 0
 	for i := 0; i < len(site.Access_points); i++ {
-		// If label already exists, update Url
+		// Label exists in system.
 		if site.Access_points[i].Label == ap.Label {
 			found = 1
-			site.Access_points[i].Url = ap.Url
-			break
+			if op == "create" {
+				// Fail if trying to create.
+				sendError(w, "Access Point already exists")
+				return
+			} else if op == "update" {
+				// Otherwise update.
+				site.Access_points[i].Url = ap.Url
+				break;
+			}
+		} else {
+			if op == "delete" {
+				// Stash non delete elements for later.
+				current_access_points = append(current_access_points, site.Access_points[i])
+			}
 		}
 	}
 
-	// If not found, then append to accesspoint list
+	// Label does not exit.
 	if found == 0 {
-		site.Access_points = append(site.Access_points, ap)
+		if op == "create" {
+			// Add new label.
+			site.Access_points = append(site.Access_points, ap)
+		} else {
+			// Fail if trying to edit or delete.
+			sendError(w, "Access Point does not exist")
+			return
+		}
+	}
+
+	if op == "delete" {
+		site.Access_points = current_access_points
 	}
 
 	// Rewrite entire site to file - I think this is easier than piece-wise update
@@ -264,7 +303,7 @@ func CreateAP(w http.ResponseWriter, r *http.Request) {
 		return
 	} else {
 		// Set the proper response code and return the created item.
-		w.WriteHeader(201)
+		w.WriteHeader(200)
 		json.NewEncoder(w).Encode(ap)
 	}
 }
@@ -307,22 +346,38 @@ func DeleteAP(w http.ResponseWriter, r *http.Request) {
 }
 
 func APHandler(w http.ResponseWriter, r *http.Request) {
+	params := mux.Vars(r)
+	ap_label := params["label"]
+
 	if r.Method == "GET" || len(r.Method) == 0 {
-		GetAP(w, r)
-	} else if r.Method == "POST" || r.Method == "PUT" {
-		CreateAP(w, r)
+		if ap_label != "" {
+			GetAP(w, r)
+		} else {
+			GetAPs(w, r)
+		}
+	} else if r.Method == "POST" {
+		CreateUpdateAP(w, r, "create")
+	} else if r.Method == "PUT" {
+		CreateUpdateAP(w, r, "update")
 	} else if r.Method == "DELETE" {
-		DeleteAP(w, r)
+		CreateUpdateAP(w, r, "delete")
 	} else {
 		return
 	}
 }
 
 func SiteHandler(w http.ResponseWriter, r *http.Request) {
+	params := mux.Vars(r)
+	site_name := params["name"]
+
 	// conditional check for type of request
 	// Request documentation states empty string from client means GET
 	if r.Method == "GET" || len(r.Method) == 0 {
-		GetSite(w,r)
+		if site_name != "" {
+			GetSite(w,r)
+		} else {
+			GetSites(w,r)
+		}
 	} else if r.Method == "POST" {
 		CreateSite(w, r)
 	} else if r.Method == "PUT" {

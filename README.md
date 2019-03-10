@@ -1,7 +1,8 @@
-Setup Instructions
--------------------
-* Install Gorilla Mux: go get github.com/gorilla/mux
-* Ensure a directory exists at "./data" for storing sites
+# CMSC 621 Project 1
+
+## Team
+	* Frank Serna
+	* Justin Rokisky
 
 ## About
 This software provides a RESTful API for interacting with sites and access points.  Sites have the following properties:
@@ -22,6 +23,9 @@ type AccessPoint struct {
 	Url string
 }
 ```
+
+Data is persisted by storing each site in json form in a file named site.Name. This allows for easy existance checks, limits the size of data that needs to be written to disk on updates and also allows less conflict if multiple operations are done concurrently
+
 
 Interaction is provided by GET, POST, PUT, DELETE commands explained below.
 
@@ -80,3 +84,8 @@ curl -X "DELETE" http://localhost:8080/sites/test
 ```bash
 curl -X "DELETE" http://localhost:8080/sites/test/accesspoints/dog
 ```
+### Testing Instructions
+We added a test suite to help test our application.
+To test:
+	* run the application using the instructions above.
+	* in a separate terminal run: go test

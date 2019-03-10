@@ -2,6 +2,8 @@ package entities
 
 import (
 	"encoding/json"
+	"regexp"
+	"errors"
 )
 
 type Site struct {
@@ -24,7 +26,37 @@ type SuccessResponse struct {
 	Success string
 }
 
-// TODO: how does this handle access points?
+func (s *Site) EqualTo(s2 *Site) (bool) {
+	s_json, err := s.ToJson()
+	if err != nil {
+		return false
+	}
+
+	s2_json, err2 := s2.ToJson()
+	if err2 != nil {
+		return false
+	}
+
+	return string(s_json) == string(s2_json)
+}
+
+func (s *Site) Validate() (error) {
+	isAlpha := regexp.MustCompile(`^[a-z]+$`).MatchString
+	if !isAlpha(s.Name) {
+		return errors.New("Site name can only contain lowercase letters")
+	}
+
+	apLabels := make(map[string]int)
+	for _, ap := range s.Access_points {
+		if apLabels[ap.Label] == 1 {
+			return errors.New("Site name can only contain lowercase letters")
+		} else {
+			apLabels[ap.Label] = 1
+		}
+	}
+	return nil
+}
+
 func (s *Site) ToJson() ([]byte, error) {
 	json, err := json.Marshal(s)
 	return json, err
